@@ -1,0 +1,146 @@
+{
+  "layout_name": "listing_detail_layout",
+  "description": "Single listing: full description, price, tags, seller card, reviews, inquiry + review actions (role-gated).",
+  "route_path": "/listings/[id]",
+  "access_roles": ["guest", "user", "admin"],
+  "elements": [
+    {
+      "element_id": "detail_title",
+      "label": "Listing title",
+      "purpose": "Display listing title",
+      "schema_column_mapping": "listings.title",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "loading": "skeleton text" }
+    },
+    {
+      "element_id": "detail_description",
+      "label": "Description",
+      "purpose": "Full listing description",
+      "schema_column_mapping": "listings.description",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "loading": "skeleton block" }
+    },
+    {
+      "element_id": "detail_price",
+      "label": "Price",
+      "purpose": "Show price or 'Price on request'",
+      "schema_column_mapping": "listings.price",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "null_price_display": "Price on request" }
+    },
+    {
+      "element_id": "detail_category",
+      "label": "Category",
+      "purpose": "Show category label",
+      "schema_column_mapping": "categories.label",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": {}
+    },
+    {
+      "element_id": "detail_tags",
+      "label": "Tags",
+      "purpose": "Show tag chips",
+      "schema_column_mapping": "listing_tags.tag",
+      "trigger_type": "click",
+      "target_action": "navigation",
+      "api_route_target": {
+        "route_file": "listings_routes.json",
+        "endpoint_id": "LISTINGS_SEARCH",
+        "method": "GET",
+        "path": "/?tag=:tag",
+        "payload": ["tag"],
+        "expected_response": {}
+      },
+      "state_rules": {}
+    },
+    {
+      "element_id": "detail_seller_card",
+      "label": "Seller card",
+      "purpose": "Show seller name + member since",
+      "schema_column_mapping": "users.name, users.created_at",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": {}
+    },
+    {
+      "element_id": "detail_review_avg",
+      "label": "Rating summary",
+      "purpose": "Star average + count from reviews",
+      "schema_column_mapping": "AVG(reviews.rating), COUNT(reviews.id)",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "no_reviews": "show 'No reviews yet'" }
+    },
+    {
+      "element_id": "detail_inquiry_button",
+      "label": "Request purchase",
+      "purpose": "Open inquiry modal; hidden for seller/owner, guests get login redirect",
+      "schema_column_mapping": "inquiries.message",
+      "trigger_type": "click",
+      "target_action": "modal",
+      "api_route_target": {
+        "route_file": "inquiries_routes.json",
+        "endpoint_id": "INQUIRIES_CREATE",
+        "method": "POST",
+        "path": "/api/inquiries",
+        "payload": ["listing_id", "message"],
+        "expected_response": { "200": { "inquiry": { "id": "inquiries.id", "status": "inquiries.status" } }, "401": { "error": "unauthorized" }, "409": { "error": "already_inquired" } }
+      },
+      "state_rules": { "hidden_when": "current user is seller, listing not approved, or guest", "modal": "message textarea (1-2000 chars)" }
+    },
+    {
+      "element_id": "detail_review_form",
+      "label": "Write a review",
+      "purpose": "Star selector + comment; one per (user, listing); hidden for seller",
+      "schema_column_mapping": "reviews.rating, reviews.comment",
+      "trigger_type": "submit",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "reviews_routes.json",
+        "endpoint_id": "REVIEWS_CREATE",
+        "method": "POST",
+        "path": "/api/reviews",
+        "payload": ["listing_id", "rating", "comment"],
+        "expected_response": { "200": { "review": { "id": "reviews.id", "rating": "reviews.rating", "comment": "reviews.comment" } }, "401": { "error": "unauthorized" }, "403": { "error": "cannot_review_own" }, "409": { "error": "already_reviewed" } }
+      },
+      "state_rules": { "hidden_when": "seller of this listing or already reviewed (after submit, replace with 'You reviewed this')" }
+    },
+    {
+      "element_id": "detail_review_list",
+      "label": "Review list",
+      "purpose": "Show reviews with author name, stars, comment, flag button (not own)",
+      "schema_column_mapping": "reviews.rating, reviews.comment, reviews.created_at, users.name",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "loading": "skeleton rows", "empty": "'No reviews yet'" }
+    },
+    {
+      "element_id": "detail_flag_button",
+      "label": "Flag review",
+      "purpose": "Open flag modal (reason 1-500 chars); hidden for own review",
+      "schema_column_mapping": "review_flags.reason",
+      "trigger_type": "click",
+      "target_action": "modal",
+      "api_route_target": {
+        "route_file": "reviews_routes.json",
+        "endpoint_id": "REVIEWS_FLAG",
+        "method": "POST",
+        "path": "/api/reviews/:review_id/flag",
+        "payload": ["reason"],
+        "expected_response": { "200": { "flag": { "id": "review_flags.id" } }, "401": { "error": "unauthorized" }, "409": { "error": "already_flagged" } }
+      },
+      "state_rules": { "hidden_when": "review is own or guest" }
+    }
+  ]
+}

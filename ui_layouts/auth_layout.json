@@ -1,0 +1,102 @@
+{
+  "layout_name": "auth_layout",
+  "description": "Login and register screens. No schema-column mapping (auth fields map to users table on backend only).",
+  "screens": [
+    {
+      "route_path": "/login",
+      "access_roles": ["guest"],
+      "elements": [
+        {
+          "element_id": "login_email",
+          "label": "Email",
+          "purpose": "Email address for login",
+          "schema_column_mapping": "users.email",
+          "trigger_type": "change",
+          "target_action": "none",
+          "api_route_target": null,
+          "state_rules": { "required": true, "type": "email", "max_length": 254, "error": "Enter a valid email" }
+        },
+        {
+          "element_id": "login_password",
+          "label": "Password",
+          "purpose": "Password for login",
+          "schema_column_mapping": "users.password_hash",
+          "trigger_type": "change",
+          "target_action": "none",
+          "api_route_target": null,
+          "state_rules": { "required": true, "min_length": 8, "error": "Password must be at least 8 characters" }
+        },
+        {
+          "element_id": "login_submit",
+          "label": "Sign in",
+          "purpose": "Submit credentials",
+          "schema_column_mapping": null,
+          "trigger_type": "submit",
+          "target_action": "backend_call",
+          "api_route_target": {
+            "route_file": "auth_routes.json",
+            "endpoint_id": "AUTH_LOGIN",
+            "method": "POST",
+            "path": "/api/auth/login",
+            "payload": ["email", "password"],
+            "expected_response": { "200": { "user": { "id": "users.id", "name": "users.name", "email": "users.email", "role": "users.role" }, "session_token": "cookie" }, "401": { "error": "invalid_credentials" }, "403": { "error": "account_suspended" } }
+          },
+          "state_rules": { "loading": "spinner on button", "disabled": "when submitting", "error": "alert above form; generic message (no account enumeration)" }
+        }
+      ]
+    },
+    {
+      "route_path": "/register",
+      "access_roles": ["guest"],
+      "elements": [
+        {
+          "element_id": "register_name",
+          "label": "Full name",
+          "purpose": "Display name",
+          "schema_column_mapping": "users.name",
+          "trigger_type": "change",
+          "target_action": "none",
+          "api_route_target": null,
+          "state_rules": { "required": true, "min_length": 2, "max_length": 80, "error": "Name must be 2-80 characters" }
+        },
+        {
+          "element_id": "register_email",
+          "label": "Email",
+          "purpose": "Account email (unique)",
+          "schema_column_mapping": "users.email",
+          "trigger_type": "change",
+          "target_action": "none",
+          "api_route_target": null,
+          "state_rules": { "required": true, "type": "email", "max_length": 254, "error": "Enter a valid email" }
+        },
+        {
+          "element_id": "register_password",
+          "label": "Password",
+          "purpose": "Account password",
+          "schema_column_mapping": "users.password_hash",
+          "trigger_type": "change",
+          "target_action": "none",
+          "api_route_target": null,
+          "state_rules": { "required": true, "min_length": 8, "error": "Password must be at least 8 characters" }
+        },
+        {
+          "element_id": "register_submit",
+          "label": "Create account",
+          "purpose": "Submit registration",
+          "schema_column_mapping": null,
+          "trigger_type": "submit",
+          "target_action": "backend_call",
+          "api_route_target": {
+            "route_file": "auth_routes.json",
+            "endpoint_id": "AUTH_REGISTER",
+            "method": "POST",
+            "path": "/api/auth/register",
+            "payload": ["name", "email", "password"],
+            "expected_response": { "200": { "user": { "id": "users.id", "name": "users.name", "email": "users.email", "role": "users.role" }, "session_token": "cookie" }, "409": { "error": "email_taken" }, "400": { "error": "validation_failed", "fields": {} } }
+          },
+          "state_rules": { "loading": "spinner on button", "disabled": "when submitting", "error": "alert above form" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "layout_name": "dashboard_layout",
+  "description": "Authenticated user home: my listings (with status badges), my inquiries (received + sent), stats. Role-gated: user/admin.",
+  "route_path": "/dashboard",
+  "access_roles": ["user", "admin"],
+  "elements": [
+    {
+      "element_id": "dashboard_stats",
+      "label": "Stats row",
+      "purpose": "Counts: my listings, pending, received inquiries (for seller), sent inquiries (for buyer)",
+      "schema_column_mapping": "COUNT(listings.id), COUNT(inquiries.id)",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "loading": "skeleton stat cards" }
+    },
+    {
+      "element_id": "dashboard_my_listings",
+      "label": "My listings",
+      "purpose": "Table of own listings: title, category, price, status badge, actions (edit/delete/view)",
+      "schema_column_mapping": "listings.id, listings.title, listings.price, listings.status, categories.label",
+      "trigger_type": "click",
+      "target_action": "navigation",
+      "api_route_target": {
+        "route_file": "listings_routes.json",
+        "endpoint_id": "LISTINGS_MY",
+        "method": "GET",
+        "path": "/api/listings/mine",
+        "payload": [],
+        "expected_response": { "200": { "listings": [{ "id": "listings.id", "title": "listings.title", "price": "listings.price", "status": "listings.status", "category": { "id": "categories.id", "label": "categories.label" }, "tags": ["listing_tags.tag"], "created_at": "listings.created_at" }] } }
+      },
+      "state_rules": { "loading": "skeleton rows", "empty": "'You have no listings yet' + CTA to /listings/new", "status_badges": "pending=amber, approved=green, rejected=red, sold=blue, deleted=gray" }
+    },
+    {
+      "element_id": "dashboard_create_button",
+      "label": "New listing",
+      "purpose": "Navigate to listing creation form",
+      "schema_column_mapping": null,
+      "trigger_type": "click",
+      "target_action": "navigation",
+      "api_route_target": { "route_file": "listings_routes.json", "endpoint_id": "LISTINGS_CREATE", "method": "POST", "path": "/listings/new", "payload": [], "expected_response": {} },
+      "state_rules": {}
+    },
+    {
+      "element_id": "dashboard_inquiries_received",
+      "label": "Inquiries received",
+      "purpose": "Inquiries on my listings: listing title, buyer name, message, status (sent/responded), respond toggle",
+      "schema_column_mapping": "inquiries.id, inquiries.message, inquiries.status, listings.title, users.name",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "inquiries_routes.json",
+        "endpoint_id": "INQUIRIES_LIST_SELLER",
+        "method": "GET",
+        "path": "/api/inquiries?role=seller",
+        "payload": [],
+        "expected_response": { "200": { "inquiries": [{ "id": "inquiries.id", "listing_id": "inquiries.listing_id", "listing_title": "listings.title", "buyer_name": "users.name", "message": "inquiries.message", "status": "inquiries.status", "created_at": "inquiries.created_at" }] } }
+      },
+      "state_rules": { "loading": "skeleton rows", "empty": "'No inquiries yet'" }
+    },
+    {
+      "element_id": "dashboard_inquiry_respond",
+      "label": "Mark responded",
+      "purpose": "Toggle inquiry status sent -> responded",
+      "schema_column_mapping": "inquiries.status",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "inquiries_routes.json",
+        "endpoint_id": "INQUIRIES_UPDATE",
+        "method": "PUT",
+        "path": "/api/inquiries/:id",
+        "payload": ["status"],
+        "expected_response": { "200": { "inquiry": { "id": "inquiries.id", "status": "inquiries.status" } } }
+      },
+      "state_rules": { "loading": "button spinner", "disabled": "when already responded" }
+    },
+    {
+      "element_id": "dashboard_inquiries_sent",
+      "label": "Inquiries sent",
+      "purpose": "Inquiries I sent: listing title, my message, status, seller name",
+      "schema_column_mapping": "inquiries.id, inquiries.message, inquiries.status, listings.title, users.name",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": {
+        "route_file": "inquiries_routes.json",
+        "endpoint_id": "INQUIRIES_LIST_BUYER",
+        "method": "GET",
+        "path": "/api/inquiries?role=buyer",
+        "payload": [],
+        "expected_response": { "200": { "inquiries": [] } }
+      },
+      "state_rules": { "loading": "skeleton rows", "empty": "'You haven't sent any inquiries'" }
+    }
+  ]
+}

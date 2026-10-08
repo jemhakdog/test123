@@ -1,0 +1,6 @@
+{
+  "layout_name": "browse_layout",
+  "description": "Deprecated → replaced by discover_layout.json at /discover. This layout was used for the original home page browse experience.",
+  "route_path": "/",
+  "status": "deprecated_replaced_by_discover_layout"
+}

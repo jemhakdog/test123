@@ -1,0 +1,48 @@
+{
+  "layout_name": "discover_layout",
+  "description": "Enhanced browse/discover page with visual Instagram-style card grid. Trending projects sorted by rating. Includes SearchControls for keyword/category/tag/sort filters.",
+  "route_path": "/discover",
+  "access_roles": ["guest", "user", "admin"],
+  "elements": [
+    {
+      "element_id": "discover_header",
+      "label": "Page header",
+      "purpose": "'Discover' title + subtitle about exploring trending capstone projects",
+      "schema_column_mapping": null,
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": {}
+    },
+    {
+      "element_id": "search_controls",
+      "label": "Search & filter bar",
+      "purpose": "Keyword input, category dropdown, tag chips, sort selector (newest/oldest/price_asc/price_desc/rating)",
+      "schema_column_mapping": "listings.title, listings.description, categories.slug, listing_tags.tag",
+      "trigger_type": "change",
+      "target_action": "navigation",
+      "api_route_target": {"route_file": "listings_routes.json", "endpoint_id": "LISTINGS_SEARCH", "method": "GET", "path": "/discover", "payload": ["query", "category", "tag", "sort"], "expected_response": {"200": {"listings": "[ListingCard[]]", "total": "number"}}},
+      "state_rules": {"loading": "skeleton cards", "empty": "No projects found message"}
+    },
+    {
+      "element_id": "listing_card_grid",
+      "label": "Visual card grid",
+      "purpose": "Responsive 1-3 column grid. Each card: status badge top-left, price top-right, title, description snippet (line-clamp-2), tags as pill badges, seller avatar+name bottom-left, review stars bottom-right",
+      "schema_column_mapping": "listings.id, listings.title, listings.price, listings.status, listings.description, listing_tags.tag, users.name, reviews.rating",
+      "trigger_type": "click",
+      "target_action": "navigation",
+      "api_route_target": {"route_file": "listings_routes.json", "endpoint_id": "LISTINGS_BROWSE", "method": "GET", "path": "/discover"},
+      "state_rules": {"hover": "card lifts (+translate-y) with shadow + border teal", "loading": "skeleton cards", "empty": "placeholder icon + text"}
+    },
+    {
+      "element_id": "bookmark_button",
+      "label": "Bookmark/save icon",
+      "purpose": "Heart icon on each card — toggles bookmark in bookmarks table",
+      "schema_column_mapping": "bookmarks.user_id, bookmarks.listing_id",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "BOOKMARK_TOGGLE", "method": "POST", "path": "/api/bookmarks/toggle", "payload": ["listingId"]},
+      "state_rules": {"filled": "red heart", "empty": "gray outline heart", "auth_required": "redirect to /login if not logged in"}
+    }
+  ]
+}

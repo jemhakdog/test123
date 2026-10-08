@@ -1,0 +1,65 @@
+{
+  "layout_name": "profile_layout",
+  "description": "User profile: edit name, change password. user/admin.",
+  "route_path": "/profile",
+  "access_roles": ["user", "admin"],
+  "elements": [
+    {
+      "element_id": "profile_name",
+      "label": "Display name",
+      "purpose": "Edit own display name",
+      "schema_column_mapping": "users.name",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "required": true, "min_length": 2, "max_length": 80, "error": "Name must be 2-80 characters" }
+    },
+    {
+      "element_id": "profile_email",
+      "label": "Email",
+      "purpose": "Read-only display of account email",
+      "schema_column_mapping": "users.email",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "readonly": true }
+    },
+    {
+      "element_id": "profile_current_password",
+      "label": "Current password",
+      "purpose": "Required to change password",
+      "schema_column_mapping": "users.password_hash",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "required": "only when changing password", "min_length": 8 }
+    },
+    {
+      "element_id": "profile_new_password",
+      "label": "New password",
+      "purpose": "New password (min 8)",
+      "schema_column_mapping": "users.password_hash",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "required": "only when changing password", "min_length": 8, "error": "Password must be at least 8 characters" }
+    },
+    {
+      "element_id": "profile_submit",
+      "label": "Save profile",
+      "purpose": "Update name and/or password",
+      "schema_column_mapping": null,
+      "trigger_type": "submit",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "users_routes.json",
+        "endpoint_id": "USERS_UPDATE_PROFILE",
+        "method": "PUT",
+        "path": "/api/users/me",
+        "payload": ["name", "current_password", "new_password"],
+        "expected_response": { "200": { "user": { "id": "users.id", "name": "users.name", "email": "users.email" } }, "400": { "error": "current_password_incorrect" }, "401": { "error": "unauthorized" } }
+      },
+      "state_rules": { "loading": "spinner", "success": "toast 'Profile updated'" }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "route_group": "reviews_routes",
+  "description": "Open reviews (one per user per listing), flagging, and admin deletion.",
+  "endpoints": [
+    {
+      "route_id": "REVIEWS_CREATE",
+      "linked_ui_elements": ["detail_review_form"],
+      "route_path": "/api/reviews",
+      "method": "POST",
+      "access_roles": ["user", "admin"],
+      "purpose": "Post a review on a listing. One per (listing, author); seller cannot review own.",
+      "accepted_attributes": {
+        "listing_id": { "type": "integer", "required": true, "db_column": "reviews.listing_id" },
+        "rating": { "type": "integer", "min": 1, "max": 5, "required": true, "db_column": "reviews.rating" },
+        "comment": { "type": "string", "min_length": 1, "max_length": 2000, "required": true, "db_column": "reviews.comment" }
+      },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "where": "id = ?", "note": "listing must exist; author != seller; listing approved" },
+        { "table": "reviews", "action": "INSERT", "columns": ["listing_id", "author_id", "rating", "comment"], "conflict": "UNIQUE(listing_id, author_id) -> 409" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "review": { "id": "reviews.id", "rating": "reviews.rating", "comment": "reviews.comment" } },
+        "400": { "error": "validation_failed" },
+        "401": { "error": "unauthorized" },
+        "403": { "error": "cannot_review_own" },
+        "409": { "error": "already_reviewed" }
+      },
+      "security": ["session required", "no self-review", "listing must be approved", "unique per (listing, author)"]
+    },
+    {
+      "route_id": "REVIEWS_FLAG",
+      "linked_ui_elements": ["detail_flag_button"],
+      "route_path": "/api/reviews/:review_id/flag",
+      "method": "POST",
+      "access_roles": ["user", "admin"],
+      "purpose": "Flag a review (reason). One per (review, flagger); cannot flag own review.",
+      "accepted_attributes": {
+        "review_id": { "type": "integer", "required": true, "in": "path", "db_column": "review_flags.review_id" },
+        "reason": { "type": "string", "min_length": 1, "max_length": 500, "required": true, "db_column": "review_flags.reason" }
+      },
+      "database_operations": [
+        { "table": "reviews", "action": "SELECT", "where": "id = ?", "note": "review must exist; flagger != review.author_id" },
+        { "table": "review_flags", "action": "INSERT", "columns": ["review_id", "flagger_id", "reason"], "conflict": "UNIQUE(review_id, flagger_id) -> 409" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "flag": { "id": "review_flags.id" } },
+        "400": { "error": "validation_failed" },
+        "401": { "error": "unauthorized" },
+        "403": { "error": "cannot_flag_own" },
+        "409": { "error": "already_flagged" }
+      },
+      "security": ["session required", "no self-flag", "unique per (review, flagger)"]
+    }
+  ]
+}

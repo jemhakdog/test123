@@ -1,0 +1,99 @@
+{
+  "layout_name": "listing_form_layout",
+  "description": "Create + edit listing form. Same field set for both; edit pre-fills and adds delete action. user/admin.",
+  "route_path": "/listings/new, /listings/[id]/edit",
+  "access_roles": ["user", "admin"],
+  "elements": [
+    {
+      "element_id": "form_title",
+      "label": "Project title",
+      "purpose": "Listing title",
+      "schema_column_mapping": "listings.title",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "required": true, "min_length": 3, "max_length": 120, "error": "Title must be 3-120 characters" }
+    },
+    {
+      "element_id": "form_description",
+      "label": "Description",
+      "purpose": "What the project is, what it does, tech stack, condition/deliverables",
+      "schema_column_mapping": "listings.description",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "required": true, "min_length": 20, "max_length": 5000, "error": "Description must be 20-5000 characters" }
+    },
+    {
+      "element_id": "form_category",
+      "label": "Category",
+      "purpose": "Category select (from categories table)",
+      "schema_column_mapping": "listings.category_id",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": {
+        "route_file": "listings_routes.json",
+        "endpoint_id": "CATEGORIES_LIST",
+        "method": "GET",
+        "path": "/api/categories",
+        "payload": [],
+        "expected_response": { "200": { "categories": [{ "id": "categories.id", "slug": "categories.slug", "label": "categories.label" }] } }
+      },
+      "state_rules": { "required": true, "options_source": "GET /api/categories", "loading": "select disabled while loading" }
+    },
+    {
+      "element_id": "form_price",
+      "label": "Price (optional)",
+      "purpose": "Asking price; blank = 'Price on request'",
+      "schema_column_mapping": "listings.price",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "optional": true, "type": "number", "min": 0, "error": "Price must be 0 or more", "placeholder": "Leave blank for 'Price on request'" }
+    },
+    {
+      "element_id": "form_tags",
+      "label": "Tags",
+      "purpose": "Free-form tech tags, comma separated; max 8, each 1-30 chars",
+      "schema_column_mapping": "listing_tags.tag",
+      "trigger_type": "change",
+      "target_action": "none",
+      "api_route_target": null,
+      "state_rules": { "optional": true, "max_items": 8, "item_max_length": 30, "normalize": "trim + lowercase", "error": "Max 8 tags, each 1-30 characters" }
+    },
+    {
+      "element_id": "form_submit",
+      "label": "Submit listing",
+      "purpose": "Create (-> pending) or save edit (-> pending re-approval)",
+      "schema_column_mapping": null,
+      "trigger_type": "submit",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "listings_routes.json",
+        "endpoint_id": "LISTINGS_CREATE",
+        "method": "POST",
+        "path": "/api/listings",
+        "payload": ["title", "description", "category_id", "price", "tags"],
+        "expected_response": { "200": { "listing": { "id": "listings.id", "status": "listings.status" } }, "400": { "error": "validation_failed", "fields": {} }, "401": { "error": "unauthorized" } }
+      },
+      "state_rules": { "loading": "spinner", "disabled": "when submitting", "success": "redirect to /dashboard with toast 'Listing submitted for approval'" }
+    },
+    {
+      "element_id": "form_delete",
+      "label": "Delete listing",
+      "purpose": "Soft-delete own listing (edit page only)",
+      "schema_column_mapping": "listings.status",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "listings_routes.json",
+        "endpoint_id": "LISTINGS_DELETE",
+        "method": "DELETE",
+        "path": "/api/listings/:id",
+        "payload": [],
+        "expected_response": { "200": { "ok": true }, "403": { "error": "forbidden" }, "404": { "error": "not_found" } }
+      },
+      "state_rules": { "confirm": "browser confirm dialog", "loading": "spinner", "success": "redirect to /dashboard" }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "layout_name": "search_users_layout",
+  "description": "Find people page with search input filtering by name/email. Results show avatar, name, email, role badge, listing count, follower count, average rating.",
+  "route_path": "/search/users",
+  "access_roles": ["user"],
+  "elements": [
+    {"element_id": "search_header", "label": "Page header", "purpose": "'Find People' title + subtitle about searching by name or email", "schema_column_mapping": null, "trigger_type": "none", "target_action": "none"},
+    {"element_id": "search_form", "label": "Search bar", "purpose": "Text input for query string + Submit button. Performs GET /search/users?q=...", "schema_column_mapping": "users.name, users.email", "trigger_type": "submit", "target_action": "navigation", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "USER_SEARCH", "method": "GET", "path": "/search/users", "payload": ["query"]}},
+    {"element_id": "user_results_list", "label": "User results", "purpose": "Each result card: large avatar (initial), name, email, listing count, follower count, avg rating (★), role badge (user/admin)", "schema_column_mapping": "users.id, users.name, users.email, users.role, COUNT(listings) AS listing_count, COUNT(follows) AS followers, AVG(reviews.rating) AS avg_rating", "trigger_type": "click", "target_action": "navigation", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "USER_SEARCH", "method": "GET", "path": "/search/users", "payload": []}, "state_rules": {"empty": "'No users found for...' message"}},
+    {"element_id": "follow_button", "label": "Follow on search results", "purpose": "Each user card can have a Follow button to follow that person directly from search results", "schema_column_mapping": "follows.follower_id, follows.following_id", "trigger_type": "click", "target_action": "backend_call", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "FOLLOW_TOGGLE", "method": "POST", "path": "/api/follow/toggle", "payload": ["followingId"]}}
+  ]
+}

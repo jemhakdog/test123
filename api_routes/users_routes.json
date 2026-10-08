@@ -1,0 +1,30 @@
+{
+  "route_group": "users_routes",
+  "description": "Authenticated user profile: update name and password.",
+  "endpoints": [
+    {
+      "route_id": "USERS_UPDATE_PROFILE",
+      "linked_ui_elements": ["profile_submit"],
+      "route_path": "/api/users/me",
+      "method": "PUT",
+      "access_roles": ["user", "admin"],
+      "purpose": "Update own display name and/or password.",
+      "accepted_attributes": {
+        "name": { "type": "string", "min_length": 2, "max_length": 80, "optional": true, "db_column": "users.name" },
+        "current_password": { "type": "string", "required": "if new_password provided", "db_column": "users.password_hash", "note": "verify against hash" },
+        "new_password": { "type": "string", "min_length": 8, "max_length": 256, "optional": true, "db_column": "users.password_hash" }
+      },
+      "database_operations": [
+        { "table": "users", "action": "SELECT", "where": "id = :current_user_id" },
+        { "table": "users", "action": "UPDATE", "columns": ["name", "password_hash"], "note": "hash new_password with bcrypt before store" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "user": { "id": "users.id", "name": "users.name", "email": "users.email" } },
+        "400": { "error": "current_password_incorrect" },
+        "401": { "error": "unauthorized" }
+      },
+      "security": ["session required", "verify current_password before password change", "bcrypt hash new password"]
+    }
+  ]
+}

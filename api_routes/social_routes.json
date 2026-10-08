@@ -1,0 +1,230 @@
+{
+  "route_group": "social_routes",
+  "description": "All social feature endpoints: follows, bookmarks, notifications, activity feed, user search, profile stats. All require authenticated session except public profile and search (guest allowed for read).",
+  "endpoints": [
+    {
+      "route_id": "FOLLOW_TOGGLE",
+      "linked_ui_elements": ["dashboard_feed_layout.follow_button", "public_profile_layout.follow_button", "search_users_layout.follow_button"],
+      "route_path": "/api/follow/toggle",
+      "method": "POST",
+      "access_roles": ["user"],
+      "purpose": "Toggle follow/unfollow relationship between current user and target user.",
+      "accepted_attributes": {
+        "followingId": { "type": "number", "required": true, "note": "ID of the user to follow/unfollow" }
+      },
+      "database_operations": [
+        { "table": "follows", "action": "SELECT", "columns": ["id"], "where": "follower_id = ? AND following_id = ?", "note": "check if already following" },
+        { "table": "follows", "action": "DELETE", "condition": "if row exists (unfollow)", "columns": [], "where": "follower_id = ? AND following_id = ?" },
+        { "table": "follows", "action": "INSERT", "condition": "if row missing (follow)", "columns": ["follower_id", "following_id", "created_at"], "values": ["$currentUserId", "$followingId", "datetime('now')"] },
+        { "table": "notifications", "action": "INSERT", "condition": "only when INSERT above (not DELETE)", "columns": ["user_id", "type", "actor_id", "entity_type", "entity_id"], "values": ["$followingId", "follow", "$currentUserId", "user", "$followingId"] }
+      ],
+      "return_type": "JSON_REDIRECT",
+      "response_structures": {
+        "200": { "ok": true },
+        "401": { "error": "unauthorized" },
+        "400": { "error": "self_follow", "note": "follower_id == following_id blocked by CHECK constraint" }
+      },
+      "security": ["session required", "self-follow blocked by SCHEMA.sql CHECK"]
+    },
+    {
+      "route_id": "USER_SEARCH",
+      "linked_ui_elements": ["search_users_layout.user_results_list", "search_users_layout.search_form"],
+      "route_path": "/search/users",
+      "method": "GET",
+      "access_roles": ["user"],
+      "purpose": "Search users by name or email fuzzy match, returning listing count, follower count, avg rating per user.",
+      "accepted_attributes": {
+        "q": { "type": "string", "max_length": 100, "optional": true, "note": "LIKE %q% over users.name + users.email" }
+      },
+      "database_operations": [
+        { "table": "users", "action": "SELECT", "columns": ["id", "name", "email", "role", "created_at"], "where": "id != ? AND (name LIKE ? OR email LIKE ?)", "params": ["$currentUserId", "%$q%", "%$q%"] },
+        { "table": "listings", "action": "SUBQUERY", "columns": ["COUNT(*) AS listing_count"], "where": "seller_id = u.id AND status = 'approved'" },
+        { "table": "reviews", "action": "SUBQUERY", "columns": ["ROUND(AVG(rating), 1) AS avg_rating"], "where": "author_id = u.id AND is_deleted = 0" },
+        { "table": "follows", "action": "SUBQUERY", "columns": ["COUNT(*) AS followers"], "where": "following_id = u.id" },
+        { "order": "followers DESC, listing_count DESC", "limit": 20 }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": {
+          "results": [{ "id": "users.id", "name": "users.name", "email": "users.email", "role": "users.role", "created_at": "users.created_at", "listing_count": "count", "avg_rating": "AVG(reviews.rating)", "followers": "count(follows)" }]
+        },
+        "401": { "error": "unauthorized" }
+      },
+      "security": ["session required", "exclude self from results"]
+    },
+    {
+      "route_id": "BOOKMARK_TOGGLE",
+      "linked_ui_elements": ["discover_layout.bookmark_button", "listing_detail_layout.bookmark_action"],
+      "route_path": "/api/bookmarks/toggle",
+      "method": "POST",
+      "access_roles": ["user"],
+      "purpose": "Toggle bookmark save/remove for a listing.",
+      "accepted_attributes": {
+        "listingId": { "type": "number", "required": true, "note": "ID of the listing to toggle" }
+      },
+      "database_operations": [
+        { "table": "bookmarks", "action": "SELECT", "columns": ["id"], "where": "user_id = ? AND listing_id = ?", "note": "check existing" },
+        { "table": "bookmarks", "action": "DELETE", "condition": "if row exists (remove bookmark)", "where": "user_id = ? AND listing_id = ?" },
+        { "table": "bookmarks", "action": "INSERT", "condition": "if row missing (add bookmark)", "columns": ["user_id", "listing_id", "created_at"], "values": ["$currentUserId", "$listingId", "datetime('now')"] }
+      ],
+      "return_type": "JSON_REDIRECT",
+      "response_structures": {
+        "200": { "ok": true },
+        "401": { "error": "unauthorized" }
+      },
+      "security": ["session required", "ownership enforced via WHERE user_id = ?"]
+    },
+    {
+      "route_id": "USER_BOOKMARKS",
+      "linked_ui_elements": ["saved_layout.saved_grid"],
+      "route_path": "/api/bookmarks",
+      "method": "GET",
+      "access_roles": ["user"],
+      "purpose": "Return all bookmarked listings for current user, ordered by bookmark date descending.",
+      "accepted_attributes": {},
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "columns": ["*", "GROUP_CONCAT(listing_tags.tag) AS tags_json", "AVG(reviews.rating) AS review_avg", "COUNT(reviews.id) AS review_count"], "where": "status = 'approved'" },
+        { "table": "bookmarks", "action": "JOIN", "on": "bookmarks.listing_id = listings.id", "columns": [] },
+        { "table": "categories", "action": "JOIN", "on": "categories.id = listings.category_id", "columns": ["id", "slug", "label"] },
+        { "table": "users", "action": "JOIN", "on": "users.id = listings.seller_id", "columns": ["id AS seller_id", "name AS seller_name"] },
+        { "order": "bookmarks.created_at DESC" },
+        { "where": "bookmarks.user_id = $currentUserId" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "bookmarks": "[ListingCard]" },
+        "200_empty": { "bookmarks": [] }
+      },
+      "security": ["session required", "scoped to bookmarks.user_id = session_user.id"]
+    },
+    {
+      "route_id": "ACTIVITY_FEED",
+      "linked_ui_elements": ["dashboard_feed_layout.activity_feed", "dashboard_feed_layout.empty_state"],
+      "route_path": "/api/feed",
+      "method": "GET",
+      "access_roles": ["user"],
+      "purpose": "Union of: (a) listings from followed users, (b) reviews from followed users, (c) own listings. Ordered by created_at desc with pagination.",
+      "accepted_attributes": {
+        "page": { "type": "integer", "min": 1, "optional": true, "default": 1 },
+        "page_size": { "type": "integer", "min": 1, "max": 50, "optional": true, "default": 20 }
+      },
+      "database_operations": [
+        { "table": "follows", "action": "SELECT", "columns": ["following_id"], "where": "follower_id = $currentUserId", "note": "get list of followed user IDs first" },
+        { "union_parts": [
+          "SELECT l.id, 'listing' AS feed_type, u.id AS actor_id, u.name AS actor_name, l.title, l.description, l.price, l.created_at, NULL AS review_comment FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.seller_id IN ($followedIds) AND l.status = 'approved'",
+          "SELECT r.id, 'review' AS feed_type, u.id AS actor_id, u.name AS actor_name, NULL AS title, l.title AS description, NULL AS price, r.created_at, r.comment AS review_comment FROM reviews r JOIN listings l ON l.id = r.listing_id JOIN users u ON u.id = r.author_id WHERE r.author_id IN ($followedIds) AND r.is_deleted = 0",
+          "SELECT l.id, 'listing' AS feed_type, u.id AS actor_id, u.name AS actor_name, l.title, l.description, l.price, l.created_at, NULL AS review_comment FROM listings l JOIN users u ON u.id = l.seller_id WHERE l.seller_id = $currentUserId AND l.status = 'approved'"
+        ]},
+        { "order": "ORDER BY feed_created_at DESC", "paginate": "LIMIT $page_size OFFSET (($page-1)*$page_size)" },
+        { "table": "categories", "action": "LOOKUP", "columns": ["label"], "for": "each category_id in results" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": {
+          "items": [{ "id": "number", "type": "'listing'|'review'", "actor": { "id": "number", "name": "string" }, "title": "string?", "description": "string?", "price": "number|null", "category": { "label": "string" }?, "review_comment": "string?"?, "is_own": "boolean", "created_at": "string" }],
+          "total": "count"
+        }
+      },
+      "security": ["session required", "own listings always included regardless of follow status"]
+    },
+    {
+      "route_id": "SELLER_LISTINGS",
+      "linked_ui_elements": ["public_profile_layout.profile_listings_grid"],
+      "route_path": null,
+      "method": "GET",
+      "access_roles": ["guest", "user"],
+      "purpose": "Public endpoint: return all approved listings for a specific seller (used by /profile/[id] page). Server-side function, not an API route.",
+      "accepted_attributes": {
+        "userId": { "type": "integer", "required": true, "in": "URL param" }
+      },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "columns": ["*", "GROUP_CONCAT(listing_tags.tag) AS tags_json", "AVG(reviews.rating) AS review_avg", "COUNT(reviews.id) AS review_count"], "where": "seller_id = ? AND status = 'approved'", "order": "created_at DESC" },
+        { "table": "categories", "action": "JOIN", "on": "categories.id = listings.category_id", "columns": ["id", "slug", "label"] },
+        { "table": "users", "action": "JOIN", "on": "users.id = listings.seller_id", "columns": ["id AS seller_id", "name AS seller_name"] }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "listings": "[ListingCard]" } }
+    },
+    {
+      "route_id": "NOTIF_LIST",
+      "linked_ui_elements": ["notifications_layout.notif_list", "nav.notification_bell"],
+      "route_path": "/api/notifications",
+      "method": "GET",
+      "access_roles": ["user"],
+      "purpose": "Fetch recent notifications joined with actor names and related listing/review titles.",
+      "accepted_attributes": {
+        "limit": { "type": "integer", "min": 1, "max": 50, "optional": true, "default": 30 }
+      },
+      "database_operations": [
+        { "table": "notifications", "action": "SELECT", "columns": ["id", "type", "actor_id", "entity_type", "entity_id", "is_read", "created_at"], "where": "user_id = $currentUserId" },
+        { "table": "users", "action": "JOIN", "on": "users.id = notifications.actor_id", "columns": ["name AS actor_name"] },
+        { "table": "listings", "action": "LEFT JOIN", "on": "notifications.entity_type = 'listing' AND notifications.entity_id = listings.id", "columns": ["title AS listing_title"] },
+        { "table": "reviews", "action": "LEFT JOIN", "on": "notifications.entity_type = 'review' AND notifications.entity_id = reviews.id", "columns": ["comment AS review_comment"] },
+        { "order": "created_at DESC", "limit": "$limit" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": {
+          "notifications": [{ "id": "number", "type": "string", "actor_id": "number", "actor_name": "string", "entity_type": "string?"?, "entity_id": "number?"?, "listing_title": "string?"?, "review_comment": "string?"?, "is_read": "0|1", "created_at": "string" }]
+        }
+      },
+      "security": ["session required", "WHERE user_id = session_user.id"]
+    },
+    {
+      "route_id": "NOTIF_COUNT",
+      "linked_ui_elements": ["nav.notification_bell_badge"],
+      "route_path": null,
+      "method": "GET",
+      "access_roles": ["user"],
+      "purpose": "Return unread notification count as integer (used for nav bell badge display). Server-side query function only.",
+      "accepted_attributes": {},
+      "database_operations": [
+        { "table": "notifications", "action": "SELECT", "columns": ["COUNT(*) AS count"], "where": "user_id = $currentUserId AND is_read = 0" }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "count": "integer" } }
+    },
+    {
+      "route_id": "NOTIF_MARK_ALL_READ",
+      "linked_ui_elements": ["notifications_layout.mark_all_read"],
+      "route_path": "/api/notifications/read",
+      "method": "POST",
+      "access_roles": ["user"],
+      "purpose": "Mark all notifications as read for current user.",
+      "accepted_attributes": {},
+      "database_operations": [
+        { "table": "notifications", "action": "UPDATE", "columns": ["is_read"], "values": ["1"], "where": "user_id = $currentUserId" }
+      ],
+      "return_type": "JSON_REDIRECT",
+      "response_structures": { "200": { "ok": true } }
+    },
+    {
+      "route_id": "USER_PROFILE_STATS",
+      "linked_ui_elements": ["public_profile_layout.avatar", "public_profile_layout.name_and_join", "public_profile_layout.stats_grid"],
+      "route_path": null,
+      "method": "GET",
+      "access_roles": ["guest", "user"],
+      "purpose": "Get public profile stats for any user. Used server-side on /profile/[id].",
+      "accepted_attributes": {
+        "userId": { "type": "integer", "required": true, "in": "URL param" }
+      },
+      "database_operations": [
+        { "table": "users", "action": "SELECT", "columns": ["id", "name", "email", "role", "created_at"] },
+        { "subqueries": [
+          "(SELECT COUNT(*) FROM listings WHERE seller_id=u.id AND status='approved') AS listing_count",
+          "(SELECT COUNT(*) FROM reviews WHERE author_id=u.id AND is_deleted=0) AS review_count",
+          "(SELECT ROUND(AVG(rating),1) FROM reviews JOIN listings ON listings.id=reviews.listing_id WHERE author_id=u.id AND is_deleted=0) AS avg_rating",
+          "(SELECT COUNT(*) FROM follows WHERE following_id=u.id) AS followers",
+          "(SELECT COUNT(*) FROM follows WHERE follower_id=u.id) AS following",
+          "(SELECT COUNT(*) FROM follows WHERE follower_id=$viewerId AND following_id=u.id) AS isFollowing"
+        ]},
+        { "where": "u.id = $userId" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "id": "number", "name": "string", "email": "string", "role": "string", "created_at": "string", "listing_count": "number", "review_count": "number", "avg_rating": "number?"?, "followers": "number", "following": "number", "isFollowing": "boolean" },
+        "404": { "error": "user_not_found" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "layout_name": "admin_layout",
+  "description": "Admin panel: moderation queue (pending listings), all listings management, user management (suspend/restore), flagged reviews.",
+  "route_path": "/admin",
+  "access_roles": ["admin"],
+  "elements": [
+    {
+      "element_id": "admin_mod_queue",
+      "label": "Pending listings",
+      "purpose": "Queue of status=pending listings with approve/reject buttons",
+      "schema_column_mapping": "listings.id, listings.title, listings.description, listings.created_at, users.name",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "admin_routes.json",
+        "endpoint_id": "ADMIN_LISTINGS_PENDING",
+        "method": "GET",
+        "path": "/api/admin/listings?status=pending",
+        "payload": [],
+        "expected_response": { "200": { "listings": [{ "id": "listings.id", "title": "listings.title", "description": "listings.description", "price": "listings.price", "seller": { "id": "users.id", "name": "users.name" }, "created_at": "listings.created_at" }] } }
+      },
+      "state_rules": { "loading": "skeleton rows", "empty": "'No pending listings'" }
+    },
+    {
+      "element_id": "admin_listing_approve",
+      "label": "Approve",
+      "purpose": "Set listing status -> approved (approved_by = admin)",
+      "schema_column_mapping": "listings.status, listings.approved_by",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "admin_routes.json",
+        "endpoint_id": "ADMIN_LISTINGS_MODERATE",
+        "method": "PUT",
+        "path": "/api/admin/listings/:id",
+        "payload": ["action"],
+        "expected_response": { "200": { "listing": { "id": "listings.id", "status": "listings.status" } } }
+      },
+      "state_rules": { "loading": "button spinner", "disabled": "when pending action in flight" }
+    },
+    {
+      "element_id": "admin_listing_reject",
+      "label": "Reject",
+      "purpose": "Set listing status -> rejected",
+      "schema_column_mapping": "listings.status",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "admin_routes.json",
+        "endpoint_id": "ADMIN_LISTINGS_MODERATE",
+        "method": "PUT",
+        "path": "/api/admin/listings/:id",
+        "payload": ["action"],
+        "expected_response": { "200": { "listing": { "id": "listings.id", "status": "listings.status" } } }
+      },
+      "state_rules": { "loading": "button spinner" }
+    },
+    {
+      "element_id": "admin_user_list",
+      "label": "User list",
+      "purpose": "All users with role + suspension status; suspend/restore buttons",
+      "schema_column_mapping": "users.id, users.name, users.email, users.role, users.is_suspended",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": {
+        "route_file": "admin_routes.json",
+        "endpoint_id": "ADMIN_USERS_LIST",
+        "method": "GET",
+        "path": "/api/admin/users",
+        "payload": [],
+        "expected_response": { "200": { "users": [{ "id": "users.id", "name": "users.name", "email": "users.email", "role": "users.role", "is_suspended": "users.is_suspended", "created_at": "users.created_at" }] } }
+      },
+      "state_rules": { "loading": "skeleton rows" }
+    },
+    {
+      "element_id": "admin_user_suspend",
+      "label": "Suspend / Restore",
+      "purpose": "Toggle is_suspended (cannot suspend self)",
+      "schema_column_mapping": "users.is_suspended",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "admin_routes.json",
+        "endpoint_id": "ADMIN_USERS_MODERATE",
+        "method": "PUT",
+        "path": "/api/admin/users/:id",
+        "payload": ["is_suspended"],
+        "expected_response": { "200": { "user": { "id": "users.id", "is_suspended": "users.is_suspended" } }, "400": { "error": "cannot_suspend_self" } }
+      },
+      "state_rules": { "loading": "button spinner", "disabled": "for self row" }
+    },
+    {
+      "element_id": "admin_flagged_reviews",
+      "label": "Flagged reviews",
+      "purpose": "Reviews with ≥1 flag + flag reasons; delete review button",
+      "schema_column_mapping": "reviews.id, reviews.rating, reviews.comment, COUNT(review_flags.id), review_flags.reason",
+      "trigger_type": "none",
+      "target_action": "none",
+      "api_route_target": {
+        "route_file": "admin_routes.json",
+        "endpoint_id": "ADMIN_REVIEWS_FLAGGED",
+        "method": "GET",
+        "path": "/api/admin/reviews/flagged",
+        "payload": [],
+        "expected_response": { "200": { "reviews": [{ "id": "reviews.id", "listing_id": "reviews.listing_id", "rating": "reviews.rating", "comment": "reviews.comment", "flag_count": "COUNT(review_flags.id)", "flags": [{ "reason": "review_flags.reason", "flagger_name": "users.name" }] }] } }
+      },
+      "state_rules": { "loading": "skeleton rows", "empty": "'No flagged reviews'" }
+    },
+    {
+      "element_id": "admin_review_delete",
+      "label": "Delete review",
+      "purpose": "Soft-delete review (is_deleted = 1)",
+      "schema_column_mapping": "reviews.is_deleted",
+      "trigger_type": "click",
+      "target_action": "backend_call",
+      "api_route_target": {
+        "route_file": "admin_routes.json",
+        "endpoint_id": "ADMIN_REVIEWS_DELETE",
+        "method": "DELETE",
+        "path": "/api/admin/reviews/:id",
+        "payload": [],
+        "expected_response": { "200": { "ok": true }, "403": { "error": "forbidden" } }
+      },
+      "state_rules": { "confirm": "browser confirm dialog", "loading": "spinner" }
+    }
+  ]
+}

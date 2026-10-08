@@ -1,0 +1,167 @@
+{
+  "route_group": "listings_routes",
+  "description": "Public discovery (search/filter/sort) + authenticated listing CRUD + categories list.",
+  "endpoints": [
+    {
+      "route_id": "CATEGORIES_LIST",
+      "linked_ui_elements": ["form_category", "browse_category_filter"],
+      "route_path": "/api/categories",
+      "method": "GET",
+      "access_roles": ["guest", "user", "admin"],
+      "purpose": "List all categories for dropdowns/filters.",
+      "accepted_attributes": {},
+      "database_operations": [
+        { "table": "categories", "action": "SELECT", "columns": ["id", "slug", "label"], "order": "label" }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "categories": [{ "id": "categories.id", "slug": "categories.slug", "label": "categories.label" }] } },
+      "security": []
+    },
+    {
+      "route_id": "LISTINGS_SEARCH",
+      "linked_ui_elements": ["browse_search_input", "browse_category_filter", "browse_tag_filter", "browse_sort_select", "detail_tags"],
+      "route_path": "/api/listings",
+      "method": "GET",
+      "access_roles": ["guest", "user", "admin"],
+      "purpose": "Search/filter/sort approved listings (public catalog).",
+      "accepted_attributes": {
+        "query": { "type": "string", "max_length": 200, "optional": true, "note": "LIKE %query% over listings.title + listings.description" },
+        "category": { "type": "string", "max_length": 40, "optional": true, "note": "categories.slug" },
+        "tag": { "type": "string", "max_length": 30, "optional": true, "note": "listing_tags.tag" },
+        "sort": { "type": "enum", "values": ["newest", "oldest", "price_asc", "price_desc", "rating"], "optional": true, "default": "newest" },
+        "page": { "type": "integer", "min": 1, "optional": true, "default": 1 },
+        "page_size": { "type": "integer", "min": 1, "max": 50, "optional": true, "default": 12 }
+      },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "columns": ["id", "title", "price", "status", "created_at", "description"], "where": "status = 'approved'" },
+        { "table": "categories", "action": "JOIN", "on": "categories.id = listings.category_id", "columns": ["id AS category_id", "slug", "label"] },
+        { "table": "listing_tags", "action": "JOIN", "on": "listing_tags.listing_id = listings.id", "columns": ["GROUP_CONCAT(tag) AS tags"], "note": "subquery/group_concat for tags" },
+        { "table": "users", "action": "JOIN", "on": "users.id = listings.seller_id", "columns": ["id AS seller_id", "name AS seller_name"] },
+        { "table": "reviews", "action": "LEFT JOIN", "on": "reviews.listing_id = listings.id AND reviews.is_deleted = 0", "columns": ["AVG(rating) AS review_avg", "COUNT(reviews.id) AS review_count"] },
+        { "table": "users", "action": "FILTER", "note": "exclude listings whose seller is_suspended = 1" },
+        { "table": "listings", "action": "ORDER", "note": "sort param: newest/oldest/price_asc(price IS NOT NULL first)/price_desc/rating" },
+        { "table": "listings", "action": "PAGINATE", "note": "page/page_size" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": {
+          "listings": [{ "id": "listings.id", "title": "listings.title", "price": "listings.price", "status": "listings.status", "description": "listings.description", "category": { "id": "categories.id", "slug": "categories.slug", "label": "categories.label" }, "tags": ["listing_tags.tag"], "seller": { "id": "users.id", "name": "users.name" }, "review_avg": "AVG(reviews.rating)", "review_count": "COUNT(reviews.id)", "created_at": "listings.created_at" }],
+          "total": "count"
+        }
+      },
+      "security": ["parameterized LIKE + all filters", "limit page_size max 50"]
+    },
+    {
+      "route_id": "LISTINGS_DETAIL",
+      "linked_ui_elements": ["browse_listing_card", "detail_title", "detail_description", "detail_price", "detail_category", "detail_tags", "detail_seller_card", "detail_review_avg", "detail_review_list"],
+      "route_path": "/api/listings/:id",
+      "method": "GET",
+      "access_roles": ["guest", "user", "admin"],
+      "purpose": "Single listing detail + its reviews (public unless pending/rejected/deleted, then owner/admin only).",
+      "accepted_attributes": { "id": { "type": "integer", "required": true, "in": "path" } },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "columns": ["*"], "where": "id = ?" },
+        { "table": "categories", "action": "JOIN", "on": "categories.id = listings.category_id", "columns": ["slug", "label"] },
+        { "table": "listing_tags", "action": "SELECT", "columns": ["tag"], "where": "listing_id = ?" },
+        { "table": "users", "action": "JOIN", "columns": ["id AS seller_id", "name AS seller_name", "created_at AS seller_joined_at", "is_suspended AS seller_suspended"] },
+        { "table": "reviews", "action": "SELECT", "columns": ["id", "rating", "comment", "created_at", "author_id"], "where": "listing_id = ? AND is_deleted = 0" },
+        { "table": "users", "action": "JOIN", "on": "users.id = reviews.author_id", "columns": ["name AS author_name"] },
+        { "note": "visibility: status=approved -> public; else only owner or admin" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": {
+          "listing": {
+            "id": "listings.id", "title": "listings.title", "description": "listings.description", "price": "listings.price", "status": "listings.status", "created_at": "listings.created_at",
+            "category": { "id": "categories.id", "slug": "categories.slug", "label": "categories.label" },
+            "tags": ["listing_tags.tag"],
+            "seller": { "id": "users.id", "name": "users.name", "joined_at": "users.created_at" },
+            "review_avg": "AVG(reviews.rating)", "review_count": "COUNT(reviews.id)"
+          },
+          "reviews": [{ "id": "reviews.id", "author_id": "reviews.author_id", "author_name": "users.name", "rating": "reviews.rating", "comment": "reviews.comment", "created_at": "reviews.created_at" }]
+        },
+        "404": { "error": "not_found" }
+      },
+      "security": ["visibility guard (public approved only; owner/admin for others)"]
+    },
+    {
+      "route_id": "LISTINGS_MY",
+      "linked_ui_elements": ["dashboard_my_listings", "dashboard_stats"],
+      "route_path": "/api/listings/mine",
+      "method": "GET",
+      "access_roles": ["user", "admin"],
+      "purpose": "Current user's listings (all statuses) for dashboard.",
+      "accepted_attributes": {},
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "columns": ["id", "title", "price", "status", "created_at", "updated_at"], "where": "seller_id = :current_user_id" },
+        { "table": "categories", "action": "JOIN", "columns": ["id", "label"] },
+        { "table": "listing_tags", "action": "JOIN", "columns": ["GROUP_CONCAT(tag) AS tags"] }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "listings": [{ "id": "listings.id", "title": "listings.title", "price": "listings.price", "status": "listings.status", "category": { "id": "categories.id", "label": "categories.label" }, "tags": ["listing_tags.tag"], "created_at": "listings.created_at" }] } },
+      "security": ["session required"]
+    },
+    {
+      "route_id": "LISTINGS_CREATE",
+      "linked_ui_elements": ["form_submit", "dashboard_create_button"],
+      "route_path": "/api/listings",
+      "method": "POST",
+      "access_roles": ["user", "admin"],
+      "purpose": "Create a listing (status=pending; auto-approved if admin).",
+      "accepted_attributes": {
+        "title": { "type": "string", "min_length": 3, "max_length": 120, "required": true, "db_column": "listings.title" },
+        "description": { "type": "string", "min_length": 20, "max_length": 5000, "required": true, "db_column": "listings.description" },
+        "category_id": { "type": "integer", "required": true, "db_column": "listings.category_id", "note": "must exist in categories" },
+        "price": { "type": "number", "min": 0, "optional": true, "db_column": "listings.price", "note": "null/blank -> NULL" },
+        "tags": { "type": "array", "max_items": 8, "items": { "type": "string", "min_length": 1, "max_length": 30 }, "optional": true, "normalize": "trim + lowercase + dedupe", "db_table": "listing_tags" }
+      },
+      "database_operations": [
+        { "table": "listings", "action": "INSERT", "columns": ["seller_id", "category_id", "title", "description", "price", "status", "approved_at", "approved_by"], "values": { "status": "pending", "note": "admin -> status=approved, approved_at=now, approved_by=self" } },
+        { "table": "listing_tags", "action": "INSERT", "columns": ["listing_id", "tag"], "note": "one row per tag" }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "listing": { "id": "listings.id", "status": "listings.status" } }, "400": { "error": "validation_failed", "fields": {} }, "401": { "error": "unauthorized" } },
+      "security": ["role check user/admin", "validation per accepted_attributes", "parameterized inserts", "transaction (listing + tags)"]
+    },
+    {
+      "route_id": "LISTINGS_UPDATE",
+      "linked_ui_elements": ["form_submit"],
+      "route_path": "/api/listings/:id",
+      "method": "PUT",
+      "access_roles": ["user", "admin"],
+      "purpose": "Edit own listing (or any, if admin). Resets to pending unless admin.",
+      "accepted_attributes": {
+        "title": { "type": "string", "min_length": 3, "max_length": 120, "required": true, "db_column": "listings.title" },
+        "description": { "type": "string", "min_length": 20, "max_length": 5000, "required": true, "db_column": "listings.description" },
+        "category_id": { "type": "integer", "required": true, "db_column": "listings.category_id" },
+        "price": { "type": "number", "min": 0, "optional": true, "db_column": "listings.price" },
+        "tags": { "type": "array", "max_items": 8, "items": { "type": "string", "max_length": 30 }, "optional": true, "db_table": "listing_tags" }
+      },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "where": "id = ?", "note": "owner check: seller_id = current_user OR admin" },
+        { "table": "listings", "action": "UPDATE", "columns": ["title", "description", "category_id", "price", "status", "updated_at"], "values": { "status": "pending", "note": "admin keeps status; content edit by non-admin -> pending" } },
+        { "table": "listing_tags", "action": "DELETE", "where": "listing_id = ?" },
+        { "table": "listing_tags", "action": "INSERT", "note": "re-insert normalized tags" }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "listing": { "id": "listings.id", "status": "listings.status" } }, "403": { "error": "forbidden" }, "404": { "error": "not_found" } },
+      "security": ["owner/admin check", "transaction", "cannot edit deleted listing"]
+    },
+    {
+      "route_id": "LISTINGS_DELETE",
+      "linked_ui_elements": ["form_delete"],
+      "route_path": "/api/listings/:id",
+      "method": "DELETE",
+      "access_roles": ["user", "admin"],
+      "purpose": "Soft-delete own listing (status=deleted).",
+      "accepted_attributes": { "id": { "type": "integer", "required": true, "in": "path" } },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "where": "id = ?", "note": "owner check" },
+        { "table": "listings", "action": "UPDATE", "columns": ["status", "updated_at"], "values": { "status": "deleted" } }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "ok": true }, "403": { "error": "forbidden" }, "404": { "error": "not_found" } },
+      "security": ["owner/admin check"]
+    }
+  ]
+}

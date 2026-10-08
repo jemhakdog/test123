@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.next/
+out/
+
+# Nested repo: this app is its own GitHub repo (test123-app)
+/app/
+
+# Python (bundled agent skills)
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local config / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

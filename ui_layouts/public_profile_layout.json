@@ -1,0 +1,14 @@
+{
+  "layout_name": "public_profile_layout",
+  "description": "Public profile page at /profile/[id]. Shows avatar (initial on gradient circle), name, join date, stats grid (projects/followers/following/rating), follow button (for non-self visitors), and their listed projects in a card grid.",
+  "route_path": "/profile/[id]",
+  "access_roles": ["guest", "user"],
+  "elements": [
+    {"element_id": "avatar", "label": "Profile avatar", "purpose": "Gradient circle (teal→cyan) with user's first initial centered in white bold text. Large size (80-96px).", "schema_column_mapping": "users.name", "trigger_type": "none"},
+    {"element_id": "name_and_join", "label": "Name + joined date", "purpose": "Bold name + 'Joined [Month Year]' subtitle", "schema_column_mapping": "users.name, users.created_at"},
+    {"element_id": "follow_button", "label": "Follow button", "purpose": "Conditional: hidden for self-profile view. Toggle between 'Following' (outline) and 'Follow' (filled teal). Calls toggleFollowAction server action.", "schema_column_mapping": "follows.follower_id, follows.following_id", "trigger_type": "click", "target_action": "backend_call", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "FOLLOW_TOGGLE", "method": "POST", "path": "/api/follow/toggle"}},
+    {"element_id": "stats_grid", "label": "Stats row", "purpose": "4-column divided grid: Projects (listings count), Followers (follows.count), Following (reverse follows count), Rating (avg review stars)", "schema_column_mapping": "COUNT(listings WHERE status='approved'), COUNT(follows.following_id=follower_id), COUNT(follows.follower_id=user_id), AVG(reviews.rating)"},
+    {"element_id": "profile_listings_grid", "label": "User's project grid", "purpose": "ListingCardGrid showing all approved listings by this seller, sorted newest-first", "schema_column_mapping": "listings.*, listing_tags.tag, reviews.rating", "trigger_type": "click", "target_action": "navigation", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "SELLER_LISTINGS", "method": "GET", "path": null, "payload": []}},
+    {"element_id": "empty_profile_state", "label": "No listings message", "purpose": "'No projects listed yet' shown when user has zero approved listings", "schema_column_mapping": null}
+  ]
+}

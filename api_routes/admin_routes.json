@@ -1,0 +1,109 @@
+{
+  "route_group": "admin_routes",
+  "description": "Admin-only: listing moderation, user suspension, flagged reviews, review deletion.",
+  "endpoints": [
+    {
+      "route_id": "ADMIN_LISTINGS_PENDING",
+      "linked_ui_elements": ["admin_mod_queue"],
+      "route_path": "/api/admin/listings?status=pending",
+      "method": "GET",
+      "access_roles": ["admin"],
+      "purpose": "List pending (or filtered) listings for moderation queue.",
+      "accepted_attributes": { "status": { "type": "enum", "values": ["pending", "approved", "rejected", "sold", "deleted"], "optional": true, "in": "query", "default": "pending" } },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "columns": ["id", "title", "description", "price", "status", "created_at"], "where": "status = :status" },
+        { "table": "users", "action": "JOIN", "columns": ["id AS seller_id", "name AS seller_name"] }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "listings": [{ "id": "listings.id", "title": "listings.title", "description": "listings.description", "price": "listings.price", "seller": { "id": "users.id", "name": "users.name" }, "created_at": "listings.created_at" }] } },
+      "security": ["admin role required"]
+    },
+    {
+      "route_id": "ADMIN_LISTINGS_MODERATE",
+      "linked_ui_elements": ["admin_listing_approve", "admin_listing_reject"],
+      "route_path": "/api/admin/listings/:id",
+      "method": "PUT",
+      "access_roles": ["admin"],
+      "purpose": "Approve or reject a listing (also pin/sold in future).",
+      "accepted_attributes": {
+        "id": { "type": "integer", "required": true, "in": "path" },
+        "action": { "type": "enum", "values": ["approve", "reject"], "required": true }
+      },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "where": "id = ?" },
+        { "table": "listings", "action": "UPDATE", "columns": ["status", "approved_at", "approved_by", "updated_at"], "values": { "approve": "status=approved, approved_at=now, approved_by=admin", "reject": "status=rejected" } }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "listing": { "id": "listings.id", "status": "listings.status" } }, "404": { "error": "not_found" } },
+      "security": ["admin role required"]
+    },
+    {
+      "route_id": "ADMIN_USERS_LIST",
+      "linked_ui_elements": ["admin_user_list"],
+      "route_path": "/api/admin/users",
+      "method": "GET",
+      "access_roles": ["admin"],
+      "purpose": "List all users with role + suspension status.",
+      "accepted_attributes": {},
+      "database_operations": [
+        { "table": "users", "action": "SELECT", "columns": ["id", "name", "email", "role", "is_suspended", "created_at"], "order": "created_at DESC" }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "users": [{ "id": "users.id", "name": "users.name", "email": "users.email", "role": "users.role", "is_suspended": "users.is_suspended", "created_at": "users.created_at" }] } },
+      "security": ["admin role required"]
+    },
+    {
+      "route_id": "ADMIN_USERS_MODERATE",
+      "linked_ui_elements": ["admin_user_suspend"],
+      "route_path": "/api/admin/users/:id",
+      "method": "PUT",
+      "access_roles": ["admin"],
+      "purpose": "Suspend or restore a user (cannot self-suspend).",
+      "accepted_attributes": {
+        "id": { "type": "integer", "required": true, "in": "path" },
+        "is_suspended": { "type": "boolean", "required": true, "db_column": "users.is_suspended" }
+      },
+      "database_operations": [
+        { "table": "users", "action": "SELECT", "where": "id = ?", "note": "cannot target self" },
+        { "table": "users", "action": "UPDATE", "columns": ["is_suspended"] }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "user": { "id": "users.id", "is_suspended": "users.is_suspended" } }, "400": { "error": "cannot_suspend_self" }, "404": { "error": "not_found" } },
+      "security": ["admin role required", "no self-suspend"]
+    },
+    {
+      "route_id": "ADMIN_REVIEWS_FLAGGED",
+      "linked_ui_elements": ["admin_flagged_reviews"],
+      "route_path": "/api/admin/reviews/flagged",
+      "method": "GET",
+      "access_roles": ["admin"],
+      "purpose": "Reviews with ≥1 flag, with flag reasons.",
+      "accepted_attributes": {},
+      "database_operations": [
+        { "table": "review_flags", "action": "SELECT", "columns": ["review_id", "reason"], "note": "join reviews + users; group by review_id" },
+        { "table": "reviews", "action": "JOIN", "columns": ["id", "rating", "comment", "listing_id"] },
+        { "table": "users", "action": "JOIN", "columns": ["name AS flagger_name"] },
+        { "note": "filter is_deleted = 0; count flags per review" }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "reviews": [{ "id": "reviews.id", "listing_id": "reviews.listing_id", "rating": "reviews.rating", "comment": "reviews.comment", "flag_count": "COUNT(review_flags.id)", "flags": [{ "reason": "review_flags.reason", "flagger_name": "users.name" }] }] } },
+      "security": ["admin role required"]
+    },
+    {
+      "route_id": "ADMIN_REVIEWS_DELETE",
+      "linked_ui_elements": ["admin_review_delete"],
+      "route_path": "/api/admin/reviews/:id",
+      "method": "DELETE",
+      "access_roles": ["admin"],
+      "purpose": "Soft-delete a review (is_deleted = 1).",
+      "accepted_attributes": { "id": { "type": "integer", "required": true, "in": "path" } },
+      "database_operations": [
+        { "table": "reviews", "action": "SELECT", "where": "id = ?" },
+        { "table": "reviews", "action": "UPDATE", "columns": ["is_deleted"], "values": { "is_deleted": 1 } }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "ok": true }, "403": { "error": "forbidden" }, "404": { "error": "not_found" } },
+      "security": ["admin role required"]
+    }
+  ]
+}

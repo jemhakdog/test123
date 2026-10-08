@@ -1,0 +1,12 @@
+{
+  "layout_name": "notifications_layout",
+  "description": "Full notifications page with bell icon badge in nav. Lists all notification types: inquiry received/responded, review, follow, like. Shows actor name, context (listing title), relative time. Unread items highlighted.",
+  "route_path": "/notifications",
+  "access_roles": ["user"],
+  "elements": [
+    {"element_id": "notif_header", "label": "Page header", "purpose": "'Notifications' title", "schema_column_mapping": null, "trigger_type": "none", "target_action": "none"},
+    {"element_id": "notif_list", "label": "Notification list", "purpose": "Vertical list of Notification cards with emoji icon, action text, actor name, relative time (e.g. '2h ago')", "schema_column_mapping": "notifications.type, users.name AS actor_name, listings.title AS listing_title, reviews.comment, notifications.is_read, notifications.created_at", "trigger_type": "click", "target_action": "navigation", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "NOTIF_LIST", "method": "GET", "path": "/api/notifications", "payload": []}, "state_rules": {"unread": "teal bg + border highlight", "hover": "light bg transition"}},
+    {"element_id": "empty_state", "label": "No notifications", "purpose": "'No notifications yet' placeholder when list is empty", "schema_column_mapping": null, "trigger_type": "none", "target_action": "none", "state_rules": {}},
+    {"element_id": "mark_all_read", "label": "Mark all read button", "purpose": "Clears unread state for all notifications via markAllNotificationsReadAction server action", "schema_column_mapping": "notifications.user_id", "trigger_type": "click", "target_action": "backend_call", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "NOTIF_MARK_READ", "method": "POST", "path": "/api/notifications/read"}}
+  ]
+}

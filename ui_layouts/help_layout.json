@@ -1,0 +1,13 @@
+{
+  "layout_name": "help_layout",
+  "description": "Help & Support page: quick help links grid (4 cards → About, FAQ, Create Listing, Report Issue), getting started checklist (5 steps), troubleshooting accordion (4 items), contact CTA footer.",
+  "route_path": "/help",
+  "access_roles": ["guest", "user"],
+  "elements": [
+    {"element_id": "help_header", "label": "Page title", "purpose": "'Help & Support' + subtitle 'Get help with common issues'", "schema_column_mapping": null},
+    {"element_id": "quick_links_grid", "label": "Quick help cards", "purpose": "2×2 grid of card links: Getting Started → /about, FAQ → /faq, Creating a Listing → /listings/new, Report an Issue → #contact", "schema_column_mapping": null, "trigger_type": "click", "target_action": "navigation"},
+    {"element_id": "getting_started_steps", "label": "Checklist", "purpose": "Numbered steps 1-5: Create account → Complete profile → Browse feed → List project → Follow others", "schema_column_mapping": null},
+    {"element_id": "troubleshooting_accordion", "label": "Troubleshooting Q&As", "purpose": "Expandable: listing not showing up, can't send inquiry, notifications not appearing, listing rejected — each with a fix explanation", "schema_column_mapping": null, "trigger_type": "click", "target_action": "toggle_expand"},
+    {"element_id": "contact_cta", "label": "Contact section", "purpose": "Gradient footer card: 'Still need help?' + Get in Touch button", "schema_column_mapping": null, "trigger_type": "click", "target_action": "navigation"}
+  ]
+}

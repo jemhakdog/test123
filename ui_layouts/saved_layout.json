@@ -1,0 +1,11 @@
+{
+  "layout_name": "saved_layout",
+  "description": "Saved/bookmarked listings page. Shows grid of bookmarked projects with ability to browse more.",
+  "route_path": "/saved",
+  "access_roles": ["user"],
+  "elements": [
+    {"element_id": "saved_header", "label": "Page header", "purpose": "'Saved Projects' title + count of bookmarked items + 'Discover more' link", "schema_column_mapping": null, "trigger_type": "click", "target_action": "navigation", "api_route_target": {"path": "/discover"}, "state_rules": {}},
+    {"element_id": "saved_grid", "label": "Bookmark card grid", "purpose": "ListingCardGrid showing all bookmarks ordered by bookmarked date descending", "schema_column_mapping": "listings.*, listing_tags.tag, users.name, reviews.rating", "trigger_type": "click", "target_action": "navigation", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "USER_BOOKMARKS", "method": "GET", "path": "/api/bookmarks", "payload": []}, "state_rules": {"empty": "'No saved projects yet' CTA to /discover"}},
+    {"element_id": "remove_bookmark", "label": "Remove from saved", "purpose": "Each card can remove its own bookmark (implemented via BookmarkButton on the listing detail page as well)", "schema_column_mapping": "bookmarks.user_id, bookmarks.listing_id", "trigger_type": "click", "target_action": "backend_call", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "BOOKMARK_REMOVE", "method": "POST", "path": "/api/bookmarks/remove", "payload": ["listingId"]}}
+  ]
+}

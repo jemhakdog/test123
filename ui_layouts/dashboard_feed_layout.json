@@ -1,0 +1,13 @@
+{
+  "layout_name": "dashboard_feed",
+  "description": "Social media-style activity feed dashboard showing listings + reviews from followed users merged with own activity. Replaces old 'my listings table + inquiries' layout. Includes compose box, stats strip, and feed items.",
+  "route_path": "/dashboard",
+  "access_roles": ["user"],
+  "elements": [
+    {"element_id": "feed_header", "label": "Feed header", "purpose": "Title 'Your Feed' + subtitle + Discover link", "schema_column_mapping": null, "trigger_type": "click", "target_action": "navigation", "api_route_target": {"path": "/discover"}, "state_rules": {}},
+    {"element_id": "compose_box", "label": "Compose input", "purpose": "Placeholder text for future post creation — avatar + 'Share a project idea...'", "schema_column_mapping": "users.name", "trigger_type": "none", "target_action": null, "api_route_target": null, "state_rules": {}},
+    {"element_id": "stats_strip", "label": "Stats bar", "purpose": "3-column: Your posts, Posts in feed, New alerts", "schema_column_mapping": "COUNT(listings), COUNT(feed_items), COUNT(notifications WHERE is_read=0)", "trigger_type": "none", "target_action": "none", "api_route_target": null, "state_rules": {}},
+    {"element_id": "activity_feed", "label": "Activity stream", "purpose": "Vertical list of ActivityPost cards: avatar, actor name + action verb, listing title, description snippet, category tag, price, relative time (e.g. '2h ago')", "schema_column_mapping": "listings.title, listings.description, listings.price, categories.label, users.name, listings.created_at", "trigger_type": "click", "target_action": "navigation", "api_route_target": {"route_file": "social_routes.json", "endpoint_id": "FEED_ITEMS", "method": "GET", "path": "/api/feed", "payload": []}, "state_rules": {"empty": "'Start following people!' CTA"}},
+    {"element_id": "empty_feed_state", "label": "Empty feed prompt", "purpose": "Icon + message encouraging follow/discover when no followed users exist", "schema_column_mapping": null, "trigger_type": "click", "target_action": "navigation", "api_route_target": {"path": "/discover"}, "state_rules": {}}
+  ]
+}

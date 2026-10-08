@@ -1,0 +1,14 @@
+{
+  "layout_name": "about_layout",
+  "description": "About page explaining CapstoneHub: hero section, 'What is it', 'How It Works' step-by-step (4 steps), user types cards (Buyer/Seller/Admin), community guidelines checklist, gradient CTA footer.",
+  "route_path": "/about",
+  "access_roles": ["guest", "user"],
+  "elements": [
+    {"element_id": "about_hero", "label": "Page header", "purpose": "'About CapstoneHub' title + description paragraph about the marketplace concept", "schema_column_mapping": null, "trigger_type": "none"},
+    {"element_id": "what_is_it", "label": "What section", "purpose": "Explanation of the platform: peer-to-peer capstone project showcase", "schema_column_mapping": null},
+    {"element_id": "how_it_works_steps", "label": "Step cards", "purpose": "4 numbered steps: List → Approve → Discover → Connect, each with icon + title + description", "schema_column_mapping": null},
+    {"element_id": "user_types_grid", "label": "User types cards", "purpose": "3-column grid: Buyers, Sellers, Admin — with avatar letter, description of each role's capabilities", "schema_column_mapping": null},
+    {"element_id": "guidelines_list", "label": "Community guidelines", "purpose": "Checklist of allowed/forbidden behaviors with ✓/✗ icons", "schema_column_mapping": null},
+    {"element_id": "cta_section", "label": "Call to action", "purpose": "Gradient card with 'Ready to share?' heading, 'Get Started Free' and 'Browse Projects' buttons", "schema_column_mapping": null, "trigger_type": "click", "target_action": "navigation", "api_route_target": [{"path": "/register"}, {"path": "/discover"}]}
+  ]
+}

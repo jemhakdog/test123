@@ -1,0 +1,65 @@
+{
+  "route_group": "auth_routes",
+  "description": "Registration, login, logout. Sessions via signed HttpOnly cookie.",
+  "endpoints": [
+    {
+      "route_id": "AUTH_REGISTER",
+      "linked_ui_elements": ["register_submit"],
+      "route_path": "/api/auth/register",
+      "method": "POST",
+      "access_roles": ["guest"],
+      "purpose": "Create a user account (role=user), start a session.",
+      "accepted_attributes": {
+        "name": { "type": "string", "min_length": 2, "max_length": 80, "required": true, "db_column": "users.name" },
+        "email": { "type": "string", "min_length": 5, "max_length": 254, "format": "email", "required": true, "db_column": "users.email" },
+        "password": { "type": "string", "min_length": 8, "max_length": 256, "required": true, "db_column": "users.password_hash", "note": "bcrypt cost 12 before store; length cap is on input only" }
+      },
+      "database_operations": [
+        { "table": "users", "action": "INSERT", "columns": ["name", "email", "password_hash", "role"], "values": { "role": "user", "is_suspended": 0 }, "conflict": "email unique -> 409" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "user": { "id": "users.id", "name": "users.name", "email": "users.email", "role": "users.role" }, "session_token": "cookie set" },
+        "400": { "error": "validation_failed", "fields": { "field_name": "message" } },
+        "409": { "error": "email_taken" }
+      },
+      "security": ["input validation per accepted_attributes", "bcrypt hash", "generic errors (no email enumeration)", "rate limit 10/min"]
+    },
+    {
+      "route_id": "AUTH_LOGIN",
+      "linked_ui_elements": ["login_submit"],
+      "route_path": "/api/auth/login",
+      "method": "POST",
+      "access_roles": ["guest"],
+      "purpose": "Verify credentials, issue session cookie.",
+      "accepted_attributes": {
+        "email": { "type": "string", "format": "email", "required": true, "db_column": "users.email" },
+        "password": { "type": "string", "required": true, "db_column": "users.password_hash" }
+      },
+      "database_operations": [
+        { "table": "users", "action": "SELECT", "columns": ["id", "name", "email", "role", "is_suspended", "password_hash"], "where": "email = ?" },
+        { "table": "users", "action": "CHECK", "note": "is_suspended = 1 -> 403 account_suspended" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "user": { "id": "users.id", "name": "users.name", "email": "users.email", "role": "users.role" }, "session_token": "cookie set" },
+        "401": { "error": "invalid_credentials" },
+        "403": { "error": "account_suspended" }
+      },
+      "security": ["bcrypt compare (timing-safe)", "generic error on bad email/password", "rate limit 10/min per IP"]
+    },
+    {
+      "route_id": "AUTH_LOGOUT",
+      "linked_ui_elements": ["nav_logout"],
+      "route_path": "/api/auth/logout",
+      "method": "POST",
+      "access_roles": ["user", "admin"],
+      "purpose": "Clear session cookie.",
+      "accepted_attributes": {},
+      "database_operations": [],
+      "return_type": "JSON",
+      "response_structures": { "200": { "ok": true } },
+      "security": ["clear cookie"]
+    }
+  ]
+}

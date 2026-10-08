@@ -1,0 +1,10 @@
+{
+  "layout_name": "faq_layout",
+  "description": "FAQ page with expandable accordion Q&As covering all platform features: what it is, listing projects, fees, contacting sellers, reviewing, rejections, following, bookmarks, reporting issues, guidelines.",
+  "route_path": "/faq",
+  "access_roles": ["guest", "user"],
+  "elements": [
+    {"element_id": "faq_header", "label": "Page title", "purpose": "'Frequently Asked Questions' + subtitle 'Everything you need to know'", "schema_column_mapping": null},
+    {"element_id": "faq_accordion_list", "label": "Accordion items", "purpose": "10 expandable sections: What is CapstoneHub, How to list a project, Is there a fee, How to contact seller, Can I review without buying, What if rejected, How does following work, How do I save projects, Can I report content, Community guidelines", "schema_column_mapping": null, "trigger_type": "click", "target_action": "toggle_expand"}
+  ]
+}

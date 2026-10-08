@@ -1,0 +1,84 @@
+{
+  "route_group": "inquiries_routes",
+  "description": "Purchase inquiries: create, list (seller/buyer views), mark responded.",
+  "endpoints": [
+    {
+      "route_id": "INQUIRIES_CREATE",
+      "linked_ui_elements": ["detail_inquiry_button"],
+      "route_path": "/api/inquiries",
+      "method": "POST",
+      "access_roles": ["user", "admin"],
+      "purpose": "Send purchase inquiry for a listing. One per (listing, buyer); duplicate updates message.",
+      "accepted_attributes": {
+        "listing_id": { "type": "integer", "required": true, "db_column": "inquiries.listing_id" },
+        "message": { "type": "string", "min_length": 1, "max_length": 2000, "required": true, "db_column": "inquiries.message" }
+      },
+      "database_operations": [
+        { "table": "listings", "action": "SELECT", "where": "id = ?", "note": "must be status=approved; seller != buyer; seller not suspended" },
+        { "table": "inquiries", "action": "INSERT OR UPDATE", "columns": ["listing_id", "buyer_id", "message", "status", "updated_at"], "note": "UNIQUE(listing_id, buyer_id) -> upsert updates message" }
+      ],
+      "return_type": "JSON",
+      "response_structures": {
+        "200": { "inquiry": { "id": "inquiries.id", "status": "inquiries.status" } },
+        "400": { "error": "validation_failed" },
+        "401": { "error": "unauthorized" },
+        "403": { "error": "cannot_inquire_own" },
+        "404": { "error": "listing_not_found" }
+      },
+      "security": ["session required", "cannot inquire own listing", "listing must be approved", "seller not suspended"]
+    },
+    {
+      "route_id": "INQUIRIES_LIST_SELLER",
+      "linked_ui_elements": ["dashboard_inquiries_received"],
+      "route_path": "/api/inquiries?role=seller",
+      "method": "GET",
+      "access_roles": ["user", "admin"],
+      "purpose": "Inquiries received on current user's listings.",
+      "accepted_attributes": { "role": { "type": "enum", "values": ["seller", "buyer"], "required": true, "in": "query" } },
+      "database_operations": [
+        { "table": "inquiries", "action": "SELECT", "where": "listing.seller_id = :current_user_id", "note": "join listings + users" },
+        { "table": "listings", "action": "JOIN", "columns": ["id AS listing_id", "title AS listing_title"] },
+        { "table": "users", "action": "JOIN", "columns": ["id AS buyer_id", "name AS buyer_name"] }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "inquiries": [{ "id": "inquiries.id", "listing_id": "listings.id", "listing_title": "listings.title", "buyer_name": "users.name", "message": "inquiries.message", "status": "inquiries.status", "created_at": "inquiries.created_at" }] } },
+      "security": ["session required", "only inquiries on own listings"]
+    },
+    {
+      "route_id": "INQUIRIES_LIST_BUYER",
+      "linked_ui_elements": ["dashboard_inquiries_sent"],
+      "route_path": "/api/inquiries?role=buyer",
+      "method": "GET",
+      "access_roles": ["user", "admin"],
+      "purpose": "Inquiries current user sent.",
+      "accepted_attributes": { "role": { "type": "enum", "values": ["seller", "buyer"], "required": true, "in": "query" } },
+      "database_operations": [
+        { "table": "inquiries", "action": "SELECT", "where": "buyer_id = :current_user_id" },
+        { "table": "listings", "action": "JOIN", "columns": ["id AS listing_id", "title AS listing_title"] },
+        { "table": "users", "action": "JOIN", "columns": ["id AS seller_id", "name AS seller_name"] }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "inquiries": [{ "id": "inquiries.id", "listing_id": "listings.id", "listing_title": "listings.title", "seller_name": "users.name", "message": "inquiries.message", "status": "inquiries.status", "created_at": "inquiries.created_at" }] } },
+      "security": ["session required"]
+    },
+    {
+      "route_id": "INQUIRIES_UPDATE",
+      "linked_ui_elements": ["dashboard_inquiry_respond"],
+      "route_path": "/api/inquiries/:id",
+      "method": "PUT",
+      "access_roles": ["user", "admin"],
+      "purpose": "Mark inquiry responded (seller of the listing or admin).",
+      "accepted_attributes": {
+        "id": { "type": "integer", "required": true, "in": "path" },
+        "status": { "type": "enum", "values": ["sent", "responded"], "required": true, "db_column": "inquiries.status" }
+      },
+      "database_operations": [
+        { "table": "inquiries", "action": "SELECT", "where": "id = ?", "note": "check seller_id of linked listing = current_user OR admin" },
+        { "table": "inquiries", "action": "UPDATE", "columns": ["status", "updated_at"] }
+      ],
+      "return_type": "JSON",
+      "response_structures": { "200": { "inquiry": { "id": "inquiries.id", "status": "inquiries.status" } }, "403": { "error": "forbidden" }, "404": { "error": "not_found" } },
+      "security": ["seller/admin check"]
+    }
+  ]
+}
